@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agendamento de Laboratório (Supabase)</title>
+    <!-- Carrega o Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carrega os ícones (Heroicons) -->
+    <script src="https://unpkg.com/heroicons@2.1.3/dist/solid.js" defer></script>
+    <!-- IMPORTANTE: Carrega o cliente JavaScript do Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* Estilo para a fonte Inter */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Adiciona a fonte Inter do Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        /* Oculta a caixa de mensagem por padrão */
+        #messageBox {
+            display: none;
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+
+    <!-- Container Principal -->
+    <div class="container mx-auto max-w-7xl p-4 md:p-8">
+        
+        <header class="mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-blue-800">
+                Agendamento do Laboratório de Informática
+                <br>
+                SESC Cachoeiro de Itapemirim
+            </h1>
+            <p class="text-gray-600 mt-2">Use o formulário para reservar um horário e consulte a agenda do dia.</p>
+        </header>
+
+        <!-- Grade principal (Formulário e Agenda) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <!-- Coluna 1: Formulário de Agendamento -->
+            <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg">
+                <h2 class="text-2xl font-semibold mb-6 text-gray-800">Reservar Horário</h2>
+                <form id="bookingForm" class="space-y-4">
+                    
+                    <div>
+                        <label for="professor" class="block text-sm font-medium text-gray-700 mb-1">Professor</label>
+                        <input type="text" id="professor" name="professor" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+
+                    <div>
+                        <label for="turma" class="block text-sm font-medium text-gray-700 mb-1">Turma</label>
+                        <input type="text" id="turma" name="turma" required
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+
+                    <div>
+                        <label for="objetivo" class="block text-sm font-medium text-gray-700 mb-1">Objetivo da Aula</label>
+                        <textarea id="objetivo" name="objetivo" rows="3" required
+                                  class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="formDate" class="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                            <input type="date" id="formDate" name="formDate" required
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label for="formTimeSlot" class="block text-sm font-medium text-gray-700 mb-1">Horário</label>
+                            <select id="formTimeSlot" name="formTimeSlot" required
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white">
+                                <!-- Os horários serão preenchidos via JS -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit"
+                            class="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-300 ease-in-out">
+                        Agendar Horário
+                    </button>
+                </form>
+            </div>
+
+            <!-- Coluna 2: Visualização da Agenda -->
+            <div class="lg:col-span-2">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
+                    <h2 class="text-2xl font-semibold text-gray-800">Agenda do Dia</h2>
+                    <div class="flex-shrink-0">
+                        <label for="scheduleDate" class="block text-sm font-medium text-gray-700 mb-1">Selecionar Data</label>
+                        <input type="date" id="scheduleDate"
+                               class="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                    </div>
+                </div>
+
+                <!-- Container da Agenda -->
+                <div id="scheduleContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Cards de horário serão inseridos aqui pelo JS -->
+                    <div class="text-gray-500 p-4 text-center col-span-1 md:col-span-2">
+                        Selecione uma data para ver os horários.
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Caixa de Mensagem (Modal Simples) -->
+    <div id="messageBox" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
+            <h3 id="messageTitle" class="text-lg font-medium text-gray-900">Mensagem</h3>
+            <p id="messageText" class="text-sm text-gray-600 mt-2"></p>
+            <button id="messageClose"
+                    class="w-full mt-4 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                Fechar
+            </button>
+        </div>
+    </div>
+
+    <!-- Scripts do Supabase -->
+    <script type="module">
+        // --- 1. CONFIGURAÇÃO DO SUPABASE ---
+        // COLE AQUI A SUA URL E CHAVE ANON DO SUPABASE
+        const SUPABASE_URL = 'COLE_A_SUA_URL_AQUI'; // Ex: 'https://xxxxxxxx.supabase.co'
+        const SUPABASE_KEY = 'COLE_A_SUA_CHAVE_ANON_AQUI'; // Ex: 'eyJh...'
+
+        // Cria o cliente Supabase
+        const { createClient } = supabase;
+        const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        console.log("Cliente Supabase inicializado.");
+
+        // --- VARIÁVEIS GLOBAIS ---
+        let userId = null;
+        let userEmail = null;
+        let currentScheduleListener = null;
+
+        // Horários fixos (baseado na regra de 50 minutos)
+        const allTimeSlots = [
+            '07:00 - 07:50',
+            '07:50 - 08:40',
+            '08:40 - 09:30',
+            // Intervalo 09:30 - 09:45 (15 min)
+            '09:45 - 10:35',
+            '10:35 - 11:25',
+            // Intervalo 11:25 - 13:00 (Almoço)
+            '13:00 - 13:50',
+            '13:50 - 14:40',
+            '14:40 - 15:30',
+            // Intervalo 15:30 - 15:45 (15 min)
+            '15:45 - 16:35',
+            '16:35 - 17:25'
+        ];
+
+        // --- INICIALIZAÇÃO ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOM Carregado. Inicializando...");
+            initApp();
+            setupEventListeners();
+        });
+
+        /**
+         * Inicializa o app, preenche os horários e define a data padrão.
+         */
+        function initApp() {
+            // Preenche o <select> de horários no formulário
+            const timeSlotSelect = document.getElementById('formTimeSlot');
+            allTimeSlots.forEach(slot => {
+                const option = document.createElement('option');
+                option.value = slot;
+                option.textContent = slot;
+                timeSlotSelect.appendChild(option);
+            });
+
+            // Define a data padrão para hoje em ambos os inputs de data
+            const today = getTodayString();
+            document.getElementById('scheduleDate').value = today;
+            document.getElementById('formDate').value = today;
+
+            // Inicia a autenticação do Supabase
+            initAuth();
+        }
+
+        /**
+         * Inicializa a autenticação do Supabase
+         * (Similar ao Firebase, vamos usar login anônimo para
+         * satisfazer as regras RLS)
+         */
+        async function initAuth() {
+            // Escuta mudanças no estado de autenticação
+            db.auth.onAuthStateChange(async (event, session) => {
+                if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+                    if (session) {
+                        userId = session.user.id;
+                        userEmail = session.user.email || 'Usuário Anônimo';
+                        console.log(`Usuário autenticado: ${userId} (${userEmail})`);
+                        // Agora que temos um usuário, carregamos a agenda
+                        loadScheduleForDate(getTodayString());
+                    }
+                } else if (event === 'SIGNED_OUT') {
+                    userId = null;
+                    userEmail = null;
+                    console.log("Usuário deslogado.");
+                    // Tenta logar anonimamente de novo se deslogar
+                    await signInAsGuest();
+                }
+            });
+
+            // Verifica a sessão atual
+            const { data, error } = await db.auth.getSession();
+            if (error) console.error("Erro ao pegar sessão:", error.message);
+
+            if (!data.session) {
+                // Se não há sessão, loga anonimamente
+                await signInAsGuest();
+            }
+        }
+
+        /**
+         * Tenta fazer login anônimo (guest)
+         */
+        async function signInAsGuest() {
+            console.log("Tentando login anônimo...");
+            const { data, error } = await db.auth.signInAnonymously();
+            if (error) {
+                console.error("Erro no login anônimo:", error.message);
+                showMessage("Não foi possível conectar ao sistema de agendamento. Verifique sua conexão.", true);
+            }
+        }
+
+        /**
+         * Configura os listeners de eventos da página.
+         */
+        function setupEventListeners() {
+            // Listener para mudança de data na agenda
+            document.getElementById('scheduleDate').addEventListener('change', (e) => {
+                loadScheduleForDate(e.target.value);
+            });
+
+            // Listener para envio do formulário
+            document.getElementById('bookingForm').addEventListener('submit', handleFormSubmit);
+
+            // Listener para fechar a caixa de mensagem
+            document.getElementById('messageClose').addEventListener('click', closeMessage);
+        }
+
+        // --- LÓGICA DO SUPABASE (LEITURA) ---
+
+        /**
+         * Busca os dados da agenda e renderiza.
+         * @param {string} dateString - A data no formato "YYYY-MM-DD".
+         */
+        async function fetchAndRender(dateString) {
+            renderLoading(); // Mostra o loading
+
+            // 1. Busca os dados no Supabase
+            const { data, error } = await db
+                .from('agendamentos') // Nome da tabela
+                .select('*') // Seleciona todas as colunas
+                .eq('date', dateString); // Onde a data for igual à selecionada
+
+            if (error) {
+                console.error("Erro ao buscar agendamentos: ", error.message);
+                showMessage(`Erro ao carregar a agenda: ${error.message}`, true);
+                renderSchedule(new Map()); // Renderiza a agenda vazia
+                return;
+            }
+
+            // 2. Processa os dados
+            console.log(`Dados recebidos para ${dateString}:`, data);
+            const bookings = new Map();
+            data.forEach((booking) => {
+                // As colunas devem ter os mesmos nomes do seu schema.sql
+                bookings.set(booking.timeSlot, booking);
+            });
+            
+            // 3. Renderiza a agenda
+            renderSchedule(bookings);
+        }
+
+        /**
+         * Carrega os agendamentos e escuta mudanças em tempo real (Realtime).
+         * @param {string} dateString - A data no formato "YYYY-MM-DD".
+         */
+        function loadScheduleForDate(dateString) {
+            if (!userId) {
+                console.log("Aguardando autenticação para carregar agenda...");
+                return;
+            }
+            if (!dateString) {
+                console.log("Data inválida, não carregando agenda.");
+                document.getElementById('scheduleContainer').innerHTML = '<p class="text-red-500 col-span-full text-center">Por favor, selecione uma data válida.</p>';
+                return;
+            }
+
+            console.log(`Carregando agenda para: ${dateString}`);
+
+            // Cancela o listener/canal anterior
+            if (currentScheduleListener) {
+                db.removeChannel(currentScheduleListener);
+                currentScheduleListener = null;
+                console.log("Canal anterior removido.");
+            }
+
+            // 1. Busca os dados iniciais
+            fetchAndRender(dateString);
+
+            // 2. Se inscreve para mudanças em tempo real (Realtime)
+            currentScheduleListener = db.channel(`public-agendamentos-${dateString}`)
+                .on(
+                    'postgres_changes', // Escuta mudanças no banco
+                    { 
+                        event: '*', // INSERT, UPDATE, DELETE
+                        schema: 'public', 
+                        table: 'agendamentos',
+                        filter: `date=eq.${dateString}` // Apenas para a data selecionada
+                    },
+                    (payload) => {
+                        console.log('Mudança em tempo real detectada!', payload);
+                        // Simplesmente busca e renderiza tudo de novo
+                        fetchAndRender(dateString);
+                    }
+                )
+                .subscribe((status, err) => {
+                    if (status === 'SUBSCRIBED') {
+                        console.log('Inscrito no canal de Realtime!');
+                    }
+                    if (err) {
+                        console.error('Erro na inscrição Realtime:', err);
+                    }
+                });
+        }
+        
+        // --- RENDERIZAÇÃO DA UI (Idêntico ao anterior) ---
+
+        function renderLoading() {
+            const container = document.getElementById('scheduleContainer');
+            container.innerHTML = `
+                <div class="col-span-1 md:col-span-2 text-center p-8">
+                    <p class="text-gray-600 text-lg animate-pulse">Carregando agenda...</p>
+                </div>
+            `;
+        }
+        
+        function renderSchedule(bookings) {
+            const container = document.getElementById('scheduleContainer');
+            container.innerHTML = ''; // Limpa o container
+
+            if (allTimeSlots.length === 0) {
+                container.innerHTML = '<p class="col-span-full text-center text-gray-500">Nenhum horário configurado.</p>';
+                return;
+            }
+
+            allTimeSlots.forEach(slot => {
+                const bookingData = bookings.get(slot);
+                let cardHtml = '';
+
+                if (bookingData) {
+                    // --- Card de Horário Ocupado ---
+                    // Verificamos se o usuário atual é o dono para mostrar o botão de deletar
+                    const isOwner = bookingData.bookedBy === userId;
+                    
+                    cardHtml = `
+                        <div class="bg-white rounded-xl shadow-md p-5 border-l-4 border-red-500">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="font-bold text-lg text-red-700">${slot}</p>
+                                    <p class="text-sm text-gray-500 mb-3">Ocupado</p>
+                                </div>
+                                ${isOwner ? `
+                                <button data-slot="${slot}" class="delete-btn text-gray-400 hover:text-red-600 transition-colors" title="Cancelar Agendamento">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                                ` : ''}
+                            </div>
+                            <div class="space-y-2 text-sm">
+                                <p><strong class="font-medium text-gray-800">Professor:</strong> ${escapeHTML(bookingData.professor)}</p>
+                                <p><strong class="font-medium text-gray-800">Turma:</strong> ${escapeHTML(bookingData.turma)}</p>
+                                <p><strong class="font-medium text-gray-800">Objetivo:</strong> ${escapeHTML(bookingData.objetivo)}</p>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // --- Card de Horário Disponível ---
+                    cardHtml = `
+                        <div class="bg-green-50 rounded-xl shadow-md p-5 border-l-4 border-green-500">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <p class="font-bold text-lg text-green-800">${slot}</p>
+                                    <p class="text-sm text-green-600">Disponível</p>
+                                </div>
+                                <button data-slot="${slot}" class="book-btn bg-green-500 text-white text-sm font-medium py-2 px-4 rounded-lg hover:bg-green-600 transition-colors">
+                                    Reservar
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+                container.innerHTML += cardHtml;
+            });
+
+            // Adiciona listeners aos novos botões
+            container.querySelectorAll('.book-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const slot = e.target.dataset.slot;
+                    populateForm(slot);
+                });
+            });
+
+            container.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.closest('.delete-btn').addEventListener('click', (e) => {
+                    const slot = e.currentTarget.dataset.slot;
+                    deleteBooking(slot);
+                });
+            });
+        }
+
+        // --- LÓGICA DO SUPABASE (ESCRITA) ---
+
+        /**
+         * Lida com o envio do formulário de agendamento.
+         */
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            if (!userId) {
+                showMessage("Você não está autenticado. Recarregue a página.", true);
+                return;
+            }
+
+            const form = e.target;
+            const bookingData = {
+                // Os nomes das colunas DEVE ser idênticos aos do seu schema.sql
+                date: form.formDate.value,
+                timeSlot: form.formTimeSlot.value,
+                professor: form.professor.value.trim(),
+                turma: form.turma.value.trim(),
+                objetivo: form.objetivo.value.trim(),
+                bookedBy: userId, // ID do usuário que agendou
+                bookedAt: new Date().toISOString()
+            };
+
+            // Validação simples
+            if (!bookingData.professor || !bookingData.turma || !bookingData.objetivo || !bookingData.date || !bookingData.timeSlot) {
+                showMessage("Por favor, preencha todos os campos.", true);
+                return;
+            }
+
+            // Insere os dados no Supabase
+            const { error } = await db
+                .from('agendamentos')
+                .insert(bookingData);
+
+            if (error) {
+                console.error("Erro ao agendar: ", error.message);
+                // A Chave Primária (date, timeSlot) previne duplicatas
+                if (error.code === '23505') { // Erro de violação de chave primária
+                     showMessage("Este horário já foi reservado. A agenda será atualizada.", true);
+                } else {
+                     showMessage(`Ocorreu um erro ao salvar: ${error.message}`, true);
+                }
+            } else {
+                showMessage("Horário agendado com sucesso!");
+                form.reset(); // Limpa o formulário
+                document.getElementById('formDate').value = getTodayString(); // Redefine a data
+                // O Realtime cuidará de atualizar a UI
+            }
+        }
+
+        /**
+         * Deleta um agendamento.
+         * @param {string} timeSlot - O horário a ser deletado.
+         */
+        async function deleteBooking(timeSlot) {
+            const selectedDate = document.getElementById('scheduleDate').value;
+            if (!selectedDate || !timeSlot) {
+                showMessage("Não foi possível identificar o agendamento para cancelar.", true);
+                return;
+            }
+
+            // Deleta da tabela 'agendamentos'
+            const { error } = await db
+                .from('agendamentos')
+                .delete()
+                .match({ date: selectedDate, timeSlot: timeSlot }); // Onde data e horário baterem
+
+            // A RLS (Row Level Security) que você criou no SQL
+            // vai garantir que só o dono (bookedBy) possa deletar.
+
+            if (error) {
+                 console.error("Erro ao deletar: ", error.message);
+                 showMessage(`Ocorreu um erro ao cancelar: ${error.message}`, true);
+            } else {
+                 showMessage("Agendamento cancelado com sucesso.");
+                 // O Realtime cuidará de atualizar a UI
+            }
+        }
+
+        // --- FUNÇÕES UTILITÁRIAS (Idênticas ao anterior) ---
+
+        function populateForm(slot) {
+            const selectedDate = document.getElementById('scheduleDate').value;
+            document.getElementById('formDate').value = selectedDate;
+            document.getElementById('formTimeSlot').value = slot;
+            document.getElementById('bookingForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            document.getElementById('professor').focus();
+        }
+
+        function getTodayString() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>"']/g, function(m) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                }[m];
+            });
+        }
+        
+        function showMessage(text, isError = false) {
+            const messageBox = document.getElementById('messageBox');
+            const messageTitle = document.getElementById('messageTitle');
+            const messageText = document.getElementById('messageText');
+            const messageClose = document.getElementById('messageClose');
+
+            messageText.textContent = text;
+            if (isError) {
+                messageTitle.textContent = 'Erro';
+                messageTitle.className = 'text-lg font-medium text-red-700';
+                messageClose.className = 'w-full mt-4 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700';
+            } else {
+                messageTitle.textContent = 'Sucesso';
+                messageTitle.className = 'text-lg font-medium text-green-700';
+                messageClose.className = 'w-full mt-4 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700';
+            }
+
+            messageBox.style.display = 'flex';
+            setTimeout(() => messageBox.style.opacity = 1, 10);
+        }
+
+        function closeMessage() {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.style.opacity = 0;
+            setTimeout(() => messageBox.style.display = 'none', 300);
+        }
+
+    </script>
+
+</body>
+</html>
