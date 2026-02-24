@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agendamento de Laboratório (Supabase)</title>
+    <title>Agendamento de Laboratório (SESC)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/heroicons@2.1.3/dist/solid.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -16,12 +16,16 @@
 <body class="bg-gray-100 text-gray-900">
 
     <div class="container mx-auto max-w-7xl p-4 md:p-8">
-        <header class="mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-blue-800">
-                Agendamento do Laboratório de Informática <br>
-                SESC Cachoeiro de Itapemirim
-            </h1>
-            <p class="text-gray-600 mt-2">Use o formulário para reservar um horário e consulte a agenda do dia.</p>
+        <header class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-bold text-blue-800">
+                    Laboratório de Informática <br>
+                    SESC Cachoeiro
+                </h1>
+            </div>
+            <button id="logoutBtn" class="bg-red-100 text-red-600 px-4 py-2 rounded-lg hover:bg-red-200 font-medium transition">
+                Sair
+            </button>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -49,12 +53,12 @@
                         <div>
                             <label for="formTimeSlot" class="block text-sm font-medium text-gray-700 mb-1">Horário</label>
                             <select id="formTimeSlot" name="formTimeSlot" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 bg-white">
-                                <option value="" disabled selected>Selecione um horário</option>
+                                <option value="" disabled selected>Selecione</option>
                             </select>
                         </div>
                     </div>
                     <button type="submit" class="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 transition duration-300">
-                        Agendar Horário
+                        Confirmar Agendamento
                     </button>
                 </form>
             </div>
@@ -64,7 +68,7 @@
                 <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
                     <h2 class="text-2xl font-semibold text-gray-800">Agenda do Dia</h2>
                     <div class="flex-shrink-0">
-                        <label for="scheduleDate" class="block text-sm font-medium text-gray-700 mb-1">Selecionar Data</label>
+                        <label for="scheduleDate" class="block text-sm font-medium text-gray-700 mb-1">Filtrar Data</label>
                         <input type="date" id="scheduleDate" class="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 bg-white">
                     </div>
                 </div>
@@ -84,28 +88,40 @@
         </div>
     </div>
 
-   <script type="module">
+    <script type="module">
         const SUPABASE_URL = 'https://sleqpwizeeezhklwzgig.supabase.co';
-        const SUPABASE_KEY = 'SUA_ANON_KEY_AQUI';
+        const SUPABASE_KEY = 'SUA_ANON_KEY_AQUI'; // <--- INSIRA SUA ANON KEY AQUI
         const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let userSession = null;
 
+        // Configuração de Horários
+        const timeSlotConfig = [
+            { value: '07:00 - 07:50', display: 'MATUTINO: 7h00 às 7h50min' },
+            { value: '07:50 - 08:40', display: 'MATUTINO: 7h50min às 8h40min' },
+            { value: '08:40 - 09:30', display: 'MATUTINO: 8h40min às 9h30min' },
+            { value: '09:00 - 09:50', display: 'MATUTINO: 9h00 às 9h50min' },
+            { value: '09:50 - 10:40', display: 'MATUTINO: 9h50min às 10h40min' },
+            { value: '10:40 - 11:30', display: 'MATUTINO: 10h40min às 11h30min' },
+            { value: '13:00 - 13:50', display: 'VESPERTINO: 13h00 às 13h50min' },
+            { value: '13:50 - 14:40', display: 'VESPERTINO: 13h50min às 14h40min' },
+            { value: '14:40 - 15:30', display: 'VESPERTINO: 14h40min às 15h30min' },
+            { value: '15:00 - 15:50', display: 'VESPERTINO: 15h00 às 15h50min' }, 
+            { value: '15:50 - 16:40', display: 'VESPERTINO: 15h50min às 16h40min' },
+            { value: '16:40 - 17:30', display: 'VESPERTINO: 16h40min às 17h30min' }
+        ];
+        const allTimeSlots = timeSlotConfig.map(slot => slot.value);
+
         // 1. VERIFICAÇÃO DE LOGIN
         async function checkAuth() {
-            const { data: { session } } = await db.auth.getSession();
-            if (!session) {
-                window.location.href = 'login.html'; // Se não estiver logado, vai para login
+            const { data: { session }, error } = await db.auth.getSession();
+            if (!session || error) {
+                window.location.href = 'login.html';
             } else {
                 userSession = session.user;
                 initApp();
             }
         }
-
-        const timeSlotConfig = [
-            // ... (mantenha sua configuração de horários aqui)
-        ];
-        const allTimeSlots = timeSlotConfig.map(slot => slot.value);
 
         document.addEventListener('DOMContentLoaded', checkAuth);
 
@@ -122,18 +138,30 @@
             document.getElementById('scheduleDate').addEventListener('change', (e) => fetchAndRender(e.target.value));
             document.getElementById('bookingForm').addEventListener('submit', handleFormSubmit);
             document.getElementById('messageClose').addEventListener('click', closeMessage);
+            document.getElementById('logoutBtn').addEventListener('click', async () => {
+                await db.auth.signOut();
+                window.location.href = 'login.html';
+            });
         }
 
         // --- BUSCA DADOS ---
         async function fetchAndRender(dateString) {
+            renderLoading();
             const { data, error } = await db.from('agendamentos').select('*').eq('date', dateString);
-            if (error) return;
+            if (error) {
+                showMessage("Erro ao carregar dados: " + error.message, true);
+                return;
+            }
             const bookings = new Map();
             data.forEach(b => bookings.set(b.timeSlot, b));
             renderSchedule(bookings);
         }
 
-        // --- RENDERIZAÇÃO (Com botão de excluir liberado) ---
+        function renderLoading() {
+            document.getElementById('scheduleContainer').innerHTML = '<div class="col-span-2 text-center p-8 animate-pulse text-gray-500">Atualizando agenda...</div>';
+        }
+
+        // --- RENDERIZAÇÃO DA AGENDA ---
         function renderSchedule(bookings) {
             const container = document.getElementById('scheduleContainer');
             container.innerHTML = '';
@@ -147,21 +175,30 @@
                     container.innerHTML += `
                         <div class="bg-white rounded-xl shadow-md p-5 border-l-4 border-red-500">
                             <div class="flex justify-between items-start">
-                                <div><p class="font-bold text-red-700">${display}</p></div>
-                                <button onclick="window.deleteBooking('${slotValue}')" class="text-red-400 hover:text-red-600">
-                                    Excluir
+                                <div>
+                                    <p class="font-bold text-lg text-red-700">${display}</p>
+                                    <p class="text-xs text-gray-400">Ocupado</p>
+                                </div>
+                                <button onclick="window.deleteBooking('${slotValue}')" class="bg-red-50 text-red-600 p-2 rounded-lg hover:bg-red-100 transition">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
                             </div>
-                            <div class="text-sm">
-                                <p><strong>Professor:</strong> ${b.professor}</p>
-                                <p><strong>Turma:</strong> ${b.turma}</p>
+                            <div class="mt-3 text-sm space-y-1">
+                                <p><strong>Professor:</strong> ${escapeHTML(b.professor)}</p>
+                                <p><strong>Turma:</strong> ${escapeHTML(b.turma)}</p>
+                                <p class="text-gray-600 italic">"${escapeHTML(b.objetivo)}"</p>
                             </div>
                         </div>`;
                 } else {
                     container.innerHTML += `
-                        <div class="bg-green-50 p-5 rounded-xl border-l-4 border-green-500 flex justify-between">
-                            <p class="font-bold text-green-800">${display}</p>
-                            <button onclick="window.populateForm('${slotValue}')" class="text-green-600 font-bold">Reservar</button>
+                        <div class="bg-green-50 p-5 rounded-xl border-l-4 border-green-500 flex justify-between items-center shadow-sm">
+                            <div>
+                                <p class="font-bold text-green-800">${display}</p>
+                                <p class="text-xs text-green-600">Disponível</p>
+                            </div>
+                            <button onclick="window.populateForm('${slotValue}')" class="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-600 transition">
+                                Reservar
+                            </button>
                         </div>`;
                 }
             });
@@ -171,42 +208,80 @@
         async function handleFormSubmit(e) {
             e.preventDefault();
             const form = e.target;
+            
             const { error } = await db.from('agendamentos').insert({
                 date: form.formDate.value,
                 timeSlot: form.formTimeSlot.value,
                 professor: form.professor.value,
                 turma: form.turma.value,
                 objetivo: form.objetivo.value,
-                bookedBy: userSession.id // USA O ID DO USUÁRIO LOGADO
+                "bookedBy": userSession.id // Nome da coluna com aspas para evitar erro case-sensitive
             });
 
-            if (error) alert("Erro: " + error.message);
-            else {
+            if (error) {
+                showMessage("Erro ao salvar: " + error.message, true);
+            } else {
+                showMessage("Sucesso! Horário reservado.");
                 form.reset();
-                fetchAndRender(document.getElementById('formDate').value);
+                document.getElementById('formDate').value = getTodayString();
+                fetchAndRender(document.getElementById('scheduleDate').value);
             }
         }
 
         // --- EXCLUIR AGENDAMENTO ---
         window.deleteBooking = async (timeSlot) => {
-            if (!confirm("Confirmar exclusão?")) return;
-            const date = document.getElementById('scheduleDate').value;
-            const { error } = await db.from('agendamentos').delete().match({ date, timeSlot });
+            if (!confirm("Deseja realmente excluir este agendamento?")) return;
             
-            if (error) alert("Erro ao excluir: " + error.message);
-            else fetchAndRender(date);
+            const date = document.getElementById('scheduleDate').value;
+            const { error } = await db.from('agendamentos')
+                .delete()
+                .match({ date: date, timeSlot: timeSlot });
+            
+            if (error) {
+                showMessage("Erro ao excluir: " + error.message, true);
+            } else {
+                showMessage("Agendamento excluído com sucesso.");
+                fetchAndRender(date);
+            }
         };
 
+        // --- UTILITÁRIOS ---
         window.populateForm = (slot) => {
             document.getElementById('formTimeSlot').value = slot;
+            document.getElementById('bookingForm').scrollIntoView({ behavior: 'smooth' });
             document.getElementById('professor').focus();
         };
 
-        // ... (mantenha funções utilitárias como getTodayString, escapeHTML, etc)
+        function populateTimeSlots() {
+            const select = document.getElementById('formTimeSlot');
+            timeSlotConfig.forEach(slot => {
+                const opt = document.createElement('option');
+                opt.value = slot.value;
+                opt.textContent = slot.display;
+                select.appendChild(opt);
+            });
+        }
+
+        function getTodayString() { return new Date().toISOString().split('T')[0]; }
+        
+        function escapeHTML(str) { 
+            return str ? str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])) : ''; 
+        }
+
+        function showMessage(text, isError = false) {
+            const box = document.getElementById('messageBox');
+            document.getElementById('messageText').textContent = text;
+            document.getElementById('messageTitle').textContent = isError ? "Ops!" : "Sucesso";
+            document.getElementById('messageTitle').className = isError ? "text-lg font-bold text-red-600" : "text-lg font-bold text-green-600";
+            box.style.display = 'flex';
+            setTimeout(() => box.style.opacity = 1, 10);
+        }
+
+        function closeMessage() {
+            const box = document.getElementById('messageBox');
+            box.style.opacity = 0;
+            setTimeout(() => box.style.display = 'none', 300);
+        }
     </script>
 </body>
 </html>
-
-
-
-
