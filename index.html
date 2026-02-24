@@ -84,54 +84,38 @@
         </div>
     </div>
 
-    <script type="module">
+   <script type="module">
         const SUPABASE_URL = 'https://sleqpwizeeezhklwzgig.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNsZXFwd2l6ZWVlemhrbHd6Z2lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5ODM4MjUsImV4cCI6MjA3NzU1OTgyNX0.s5vzX8DY1iTWo1ltnZA9hWZ_hoeru3j1SinzM6uOLUY';
+        const SUPABASE_KEY = 'SUA_ANON_KEY_AQUI';
+        const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        let db = null;
-        const timeSlotConfig = [
-            { value: '07:00 - 07:50', display: 'MATUTINO: 7h00 às 7h50min' },
-            { value: '07:50 - 08:40', display: 'MATUTINO: 7h50min às 8h40min' },
-            { value: '08:40 - 09:30', display: 'MATUTINO: 8h40min às 9h30min' },
-            { value: '09:00 - 09:50', display: 'MATUTINO: 9h00 às 9h50min' },
-            { value: '09:50 - 10:40', display: 'MATUTINO: 9h50min às 10h40min' },
-            { value: '10:40 - 11:30', display: 'MATUTINO: 10h40min às 11h30min' },
-            { value: '13:00 - 13:50', display: 'VESPERTINO: 13h00 às 13h50min' },
-            { value: '13:50 - 14:40', display: 'VESPERTINO: 13h50min às 14h40min' },
-            { value: '14:40 - 15:30', display: 'VESPERTINO: 14h40min às 15h30min' },
-            { value: '15:00 - 15:50', display: 'VESPERTINO: 15h00 às 15h50min' }, 
-            { value: '15:50 - 16:40', display: 'VESPERTINO: 15h50min às 16h40min' },
-            { value: '16:40 - 17:30', display: 'VESPERTINO: 16h40min às 17h30min' }
-        ];
-        
-        const allTimeSlots = timeSlotConfig.map(slot => slot.value);
+        let userSession = null;
 
-        document.addEventListener('DOMContentLoaded', () => {
-            populateTimeSlots(); 
-            initApp();
-            setupEventListeners();
-        });
-
-        function populateTimeSlots() {
-            const select = document.getElementById('formTimeSlot');
-            timeSlotConfig.forEach(slot => {
-                const opt = document.createElement('option');
-                opt.value = slot.value;
-                opt.textContent = slot.display;
-                select.appendChild(opt);
-            });
+        // 1. VERIFICAÇÃO DE LOGIN
+        async function checkAuth() {
+            const { data: { session } } = await db.auth.getSession();
+            if (!session) {
+                window.location.href = 'login.html'; // Se não estiver logado, vai para login
+            } else {
+                userSession = session.user;
+                initApp();
+            }
         }
 
+        const timeSlotConfig = [
+            // ... (mantenha sua configuração de horários aqui)
+        ];
+        const allTimeSlots = timeSlotConfig.map(slot => slot.value);
+
+        document.addEventListener('DOMContentLoaded', checkAuth);
+
         function initApp() {
-            try {
-                db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                const today = getTodayString();
-                document.getElementById('scheduleDate').value = today;
-                document.getElementById('formDate').value = today;
-                fetchAndRender(today); // Carregamento inicial
-            } catch (e) {
-                console.error(e);
-            }
+            populateTimeSlots();
+            const today = getTodayString();
+            document.getElementById('scheduleDate').value = today;
+            document.getElementById('formDate').value = today;
+            fetchAndRender(today);
+            setupEventListeners();
         }
 
         function setupEventListeners() {
@@ -140,123 +124,89 @@
             document.getElementById('messageClose').addEventListener('click', closeMessage);
         }
 
+        // --- BUSCA DADOS ---
         async function fetchAndRender(dateString) {
-            if (!db) return;
-            renderLoading();
             const { data, error } = await db.from('agendamentos').select('*').eq('date', dateString);
-            if (error) {
-                showMessage("Erro ao carregar dados.", true);
-                return;
-            }
+            if (error) return;
             const bookings = new Map();
             data.forEach(b => bookings.set(b.timeSlot, b));
             renderSchedule(bookings);
         }
 
-        function renderLoading() {
-            document.getElementById('scheduleContainer').innerHTML = '<div class="col-span-2 text-center p-8 animate-pulse text-gray-500">Atualizando agenda...</div>';
-        }
-
+        // --- RENDERIZAÇÃO (Com botão de excluir liberado) ---
         function renderSchedule(bookings) {
             const container = document.getElementById('scheduleContainer');
             container.innerHTML = '';
             const slotDisplayMap = new Map(timeSlotConfig.map(i => [i.value, i.display]));
 
             allTimeSlots.forEach(slotValue => {
-                const data = bookings.get(slotValue);
+                const b = bookings.get(slotValue);
                 const display = slotDisplayMap.get(slotValue);
                 
-                if (data) {
+                if (b) {
                     container.innerHTML += `
                         <div class="bg-white rounded-xl shadow-md p-5 border-l-4 border-red-500">
                             <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="font-bold text-lg text-red-700">${display}</p>
-                                    <p class="text-sm text-gray-500 mb-3">Ocupado</p>
-                                </div>
-                                <button onclick="window.deleteBooking('${slotValue}')" class="text-gray-400 hover:text-red-600 transition-colors">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                <div><p class="font-bold text-red-700">${display}</p></div>
+                                <button onclick="window.deleteBooking('${slotValue}')" class="text-red-400 hover:text-red-600">
+                                    Excluir
                                 </button>
                             </div>
-                            <div class="space-y-1 text-sm">
-                                <p><strong>Professor:</strong> ${escapeHTML(data.professor)}</p>
-                                <p><strong>Turma:</strong> ${escapeHTML(data.turma)}</p>
-                                <p><strong>Objetivo:</strong> ${escapeHTML(data.objetivo)}</p>
+                            <div class="text-sm">
+                                <p><strong>Professor:</strong> ${b.professor}</p>
+                                <p><strong>Turma:</strong> ${b.turma}</p>
                             </div>
                         </div>`;
                 } else {
                     container.innerHTML += `
-                        <div class="bg-green-50 rounded-xl shadow-md p-5 border-l-4 border-green-500 flex justify-between items-center">
-                            <div>
-                                <p class="font-bold text-lg text-green-800">${display}</p>
-                                <p class="text-sm text-green-600">Disponível</p>
-                            </div>
-                            <button onclick="window.populateForm('${slotValue}')" class="bg-green-500 text-white text-sm font-medium py-2 px-4 rounded-lg hover:bg-green-600">Reservar</button>
+                        <div class="bg-green-50 p-5 rounded-xl border-l-4 border-green-500 flex justify-between">
+                            <p class="font-bold text-green-800">${display}</p>
+                            <button onclick="window.populateForm('${slotValue}')" class="text-green-600 font-bold">Reservar</button>
                         </div>`;
                 }
             });
         }
 
+        // --- SALVAR AGENDAMENTO ---
         async function handleFormSubmit(e) {
             e.preventDefault();
             const form = e.target;
-            const selectedDate = form.formDate.value;
-            const bookingData = {
-                date: selectedDate,
+            const { error } = await db.from('agendamentos').insert({
+                date: form.formDate.value,
                 timeSlot: form.formTimeSlot.value,
-                professor: form.professor.value.trim(),
-                turma: form.turma.value.trim(),
-                objetivo: form.objetivo.value.trim(),
-                bookedBy: form.professor.value.trim() // Salva o nome do professor como ID de referência
-            };
+                professor: form.professor.value,
+                turma: form.turma.value,
+                objetivo: form.objetivo.value,
+                bookedBy: userSession.id // USA O ID DO USUÁRIO LOGADO
+            });
 
-            const { error } = await db.from('agendamentos').insert(bookingData);
-
-            if (error) {
-                showMessage(error.code === '23505' ? "Horário já reservado." : error.message, true);
-            } else {
-                showMessage("Agendado com sucesso!");
+            if (error) alert("Erro: " + error.message);
+            else {
                 form.reset();
-                document.getElementById('formDate').value = selectedDate;
-                fetchAndRender(selectedDate); // Atualiza sem recarregar
+                fetchAndRender(document.getElementById('formDate').value);
             }
         }
 
-        // Funções globais para os botões gerados dinamicamente
+        // --- EXCLUIR AGENDAMENTO ---
         window.deleteBooking = async (timeSlot) => {
-            if (!confirm("Deseja cancelar este agendamento?")) return;
+            if (!confirm("Confirmar exclusão?")) return;
             const date = document.getElementById('scheduleDate').value;
             const { error } = await db.from('agendamentos').delete().match({ date, timeSlot });
-            if (error) showMessage("Erro ao excluir.", true);
-            else fetchAndRender(date); // Atualiza sem recarregar
+            
+            if (error) alert("Erro ao excluir: " + error.message);
+            else fetchAndRender(date);
         };
 
         window.populateForm = (slot) => {
             document.getElementById('formTimeSlot').value = slot;
-            document.getElementById('bookingForm').scrollIntoView({ behavior: 'smooth' });
             document.getElementById('professor').focus();
         };
 
-        function getTodayString() { return new Date().toISOString().split('T')[0]; }
-        function escapeHTML(str) { return str ? str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])) : ''; }
-        
-        function showMessage(text, isError = false) {
-            const box = document.getElementById('messageBox');
-            document.getElementById('messageText').textContent = text;
-            document.getElementById('messageTitle').textContent = isError ? "Erro" : "Sucesso";
-            document.getElementById('messageTitle').className = isError ? "text-lg font-medium text-red-600" : "text-lg font-medium text-green-600";
-            box.style.display = 'flex';
-            setTimeout(() => box.style.opacity = 1, 10);
-        }
-
-        function closeMessage() {
-            const box = document.getElementById('messageBox');
-            box.style.opacity = 0;
-            setTimeout(() => box.style.display = 'none', 300);
-        }
+        // ... (mantenha funções utilitárias como getTodayString, escapeHTML, etc)
     </script>
 </body>
 </html>
+
 
 
 
